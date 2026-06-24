@@ -1,43 +1,19 @@
 // YouTube player interaction
-let player = null;
-let isPlaying = false;
-let currentVideoData = {
-  title: '',
-  channel: '',
-  duration: 0,
-  currentTime: 0
-};
 
-// Find the YouTube player
+// Find the YouTube player video element
 function getPlayer() {
-  try {
-    // Try to find the video player
-    const video = document.querySelector('video');
-    if (video) return video;
-    
-    // Alternative: find the player iframe
-    const iframe = document.querySelector('iframe[src*="youtube.com"]');
-    if (iframe && iframe.contentDocument) {
-      return iframe.contentDocument.querySelector('video');
-    }
-    return null;
-  } catch (e) {
-    return null;
-  }
+  return document.querySelector('video') || null;
 }
 
 // Get video metadata
 function getVideoInfo() {
   try {
-    // Get title
     const titleElement = document.querySelector('h1.ytd-watch-metadata yt-formatted-string');
     const title = titleElement ? titleElement.textContent.trim() : '';
-    
-    // Get channel name
+
     const channelElement = document.querySelector('ytd-channel-name a');
     const channel = channelElement ? channelElement.textContent.trim() : '';
-    
-    // Get player
+
     const video = getPlayer();
     if (video) {
       return {
@@ -70,52 +46,46 @@ function togglePlay() {
 }
 
 function nextVideo() {
-  // Try to click the next button
   try {
-    const nextButton = document.querySelector('ytd-watch-next-secondary-button');
+    const nextButton = document.querySelector('.ytp-next-button');
     if (nextButton) {
       nextButton.click();
       return { success: true };
     }
   } catch (e) {}
-  
-  // Alternative: find by data attributes
+
   try {
     const buttons = document.querySelectorAll('ytd-button-renderer');
     for (const button of buttons) {
-      if (button.querySelector('yt-icon[icon*="next"]') || 
-          button.getAttribute('aria-label') === 'Next') {
+      if (button.getAttribute('aria-label') === 'Next') {
         button.click();
         return { success: true };
       }
     }
   } catch (e) {}
-  
+
   return { success: false, error: 'Could not find next button' };
 }
 
 function prevVideo() {
-  // Try to click the previous button
   try {
-    const prevButton = document.querySelector('ytd-watch-previous-secondary-button');
+    const prevButton = document.querySelector('.ytp-prev-button');
     if (prevButton) {
       prevButton.click();
       return { success: true };
     }
   } catch (e) {}
-  
-  // Alternative: find by data attributes
+
   try {
     const buttons = document.querySelectorAll('ytd-button-renderer');
     for (const button of buttons) {
-      if (button.querySelector('yt-icon[icon*="previous"]') || 
-          button.getAttribute('aria-label') === 'Previous') {
+      if (button.getAttribute('aria-label') === 'Previous') {
         button.click();
         return { success: true };
       }
     }
   } catch (e) {}
-  
+
   return { success: false, error: 'Could not find previous button' };
 }
 
@@ -128,13 +98,30 @@ function seekTo(percentage) {
   return { success: false, error: 'Could not seek' };
 }
 
-// Send updates to side panel
+function setVolume(level) {
+  const video = getPlayer();
+  if (video) {
+    video.volume = Math.max(0, Math.min(1, level));
+    return { success: true, volume: video.volume };
+  }
+  return { success: false, error: 'No video player found' };
+}
+
+function getVolume() {
+  const video = getPlayer();
+  if (video) {
+    return { success: true, volume: video.volume, muted: video.muted };
+  }
+  return { success: false, error: 'No video player found' };
+}
+
+// Send updates to side panel; suppress error when panel is not open
 function sendUpdate() {
   const info = getVideoInfo();
   if (info.success) {
-    chrome.runtime.sendMessage({
-      action: 'videoUpdate',
-      ...info
+    chrome.runtime.sendMessage({ action: 'videoUpdate', ...info }, () => {
+      // Suppress "receiving end does not exist" when side panel is closed
+      void chrome.runtime.lastError;
     });
   }
 }
@@ -142,7 +129,7 @@ function sendUpdate() {
 // Listen for messages from background
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   let result;
-  
+
   switch (message.action) {
     case 'togglePlay':
       result = togglePlay();
@@ -156,17 +143,26 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     case 'seek':
       result = seekTo(message.percentage);
       break;
+    case 'setVolume':
+      result = setVolume(message.level);
+      break;
     case 'getInfo':
       result = getVideoInfo();
+      // Include volume in getInfo response
+      const volInfo = getVolume();
+      if (volInfo.success) {
+        result.volume = volInfo.volume;
+        result.muted = volInfo.muted;
+      }
       break;
     default:
       result = { success: false, error: 'Unknown action' };
   }
-  
+
   sendResponse(result);
 });
 
-// Listen for video events
+// Push updates to side panel on player events
 document.addEventListener('play', (e) => {
   if (e.target.tagName === 'VIDEO') {
     setTimeout(sendUpdate, 100);
@@ -179,9 +175,14 @@ document.addEventListener('pause', (e) => {
   }
 }, true);
 
+document.addEventListener('volumechange', (e) => {
+  if (e.target.tagName === 'VIDEO') {
+    setTimeout(sendUpdate, 100);
+  }
+}, true);
+
 document.addEventListener('timeupdate', (e) => {
   if (e.target.tagName === 'VIDEO') {
-    // Debounce updates
     if (!e.target._lastUpdate || Date.now() - e.target._lastUpdate > 500) {
       e.target._lastUpdate = Date.now();
       sendUpdate();
@@ -191,15 +192,28 @@ document.addEventListener('timeupdate', (e) => {
 
 // Initial update after page loads
 setTimeout(sendUpdate, 1000);
-setInterval(sendUpdate, 3000); // Periodic updates
 
-// Listen for navigation (SPA)
-let lastUrl = location.href;
-new MutationObserver(() => {
-  if (location.href !== lastUrl) {
-    lastUrl = location.href;
-    setTimeout(sendUpdate, 1000);
-  }
-}).observe(document, { subtree: true, childList: true });
+// Fallback periodic update (low frequency — push events handle the rest)
+setInterval(sendUpdate, 5000);
+
+// Detect YouTube SPA navigation by observing the title element only
+const titleObserver = new MutationObserver(() => {
+  setTimeout(sendUpdate, 1000);
+});
+
+const titleEl = document.querySelector('title');
+if (titleEl) {
+  titleObserver.observe(titleEl, { childList: true });
+} else {
+  // Fallback: observe head until title is available
+  const headObserver = new MutationObserver(() => {
+    const t = document.querySelector('title');
+    if (t) {
+      headObserver.disconnect();
+      titleObserver.observe(t, { childList: true });
+    }
+  });
+  headObserver.observe(document.head || document.documentElement, { childList: true });
+}
 
 console.log('YouTube Audio Controller: Content script loaded');

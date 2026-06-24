@@ -11,7 +11,7 @@
     <div class="header">
       <h2>🎵 Audio Controller</h2>
     </div>
-    
+
     <div id="trackInfo" class="track-info">
       <div id="videoTitle">No video playing</div>
       <div id="channelName" class="channel-name"></div>
@@ -23,7 +23,7 @@
           <path d="M6 6h2v12H6zm3.5 6l8.5 6V6z" fill="currentColor"/>
         </svg>
       </button>
-      
+
       <button id="playPauseButton" class="control-btn play-pause" title="Play/Pause">
         <svg id="playIcon" viewBox="0 0 24 24" width="32" height="32">
           <path d="M8 5v14l11-7z" fill="currentColor"/>
@@ -32,7 +32,7 @@
           <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" fill="currentColor"/>
         </svg>
       </button>
-      
+
       <button id="nextButton" class="control-btn" title="Next">
         <svg viewBox="0 0 24 24" width="24" height="24">
           <path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z" fill="currentColor"/>
@@ -40,9 +40,13 @@
       </button>
     </div>
 
+    <div class="volume-row">
+      <span id="volumeIndicator" class="volume-indicator" title="Click to mute/unmute">🔊</span>
+      <input id="volumeSlider" class="volume-slider" type="range" min="0" max="100" value="100" title="Volume">
+    </div>
+
     <div class="status-bar">
       <span id="statusText">Not connected</span>
-      <span id="volumeIndicator" class="volume-indicator">🔊</span>
     </div>
 
     <div class="footer">
