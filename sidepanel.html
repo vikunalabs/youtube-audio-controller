@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>YouTube Audio Controller</title>
+  <link rel="stylesheet" href="sidepanel.css">
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h2>🎵 Audio Controller</h2>
+    </div>
+    
+    <div id="trackInfo" class="track-info">
+      <div id="videoTitle">No video playing</div>
+      <div id="channelName" class="channel-name"></div>
+    </div>
+
+    <div class="controls">
+      <button id="prevButton" class="control-btn" title="Previous">
+        <svg viewBox="0 0 24 24" width="24" height="24">
+          <path d="M6 6h2v12H6zm3.5 6l8.5 6V6z" fill="currentColor"/>
+        </svg>
+      </button>
+      
+      <button id="playPauseButton" class="control-btn play-pause" title="Play/Pause">
+        <svg id="playIcon" viewBox="0 0 24 24" width="32" height="32">
+          <path d="M8 5v14l11-7z" fill="currentColor"/>
+        </svg>
+        <svg id="pauseIcon" viewBox="0 0 24 24" width="32" height="32" style="display:none">
+          <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" fill="currentColor"/>
+        </svg>
+      </button>
+      
+      <button id="nextButton" class="control-btn" title="Next">
+        <svg viewBox="0 0 24 24" width="24" height="24">
+          <path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z" fill="currentColor"/>
+        </svg>
+      </button>
+    </div>
+
+    <div class="status-bar">
+      <span id="statusText">Not connected</span>
+      <span id="volumeIndicator" class="volume-indicator">🔊</span>
+    </div>
+
+    <div class="footer">
+      <div id="progressContainer" class="progress-container">
+        <div id="progressBar" class="progress-bar"></div>
+      </div>
+      <div class="time-display">
+        <span id="currentTime">0:00</span>
+        <span id="totalTime">0:00</span>
+      </div>
+    </div>
+  </div>
+  <script src="sidepanel.js"></script>
+</body>
+</html>
