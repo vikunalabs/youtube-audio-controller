@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -7,57 +7,125 @@
   <link rel="stylesheet" href="sidepanel.css">
 </head>
 <body>
-  <div class="container">
+  <div class="app">
+
+    <!-- Header -->
     <div class="header">
-      <h2>🎵 Audio Controller</h2>
-    </div>
-
-    <div id="trackInfo" class="track-info">
-      <div id="videoTitle">No video playing</div>
-      <div id="channelName" class="channel-name"></div>
-    </div>
-
-    <div class="controls">
-      <button id="prevButton" class="control-btn" title="Previous">
-        <svg viewBox="0 0 24 24" width="24" height="24">
-          <path d="M6 6h2v12H6zm3.5 6l8.5 6V6z" fill="currentColor"/>
+      <div class="logo">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none">
+          <circle cx="12" cy="12" r="10" stroke="#e8473f" stroke-width="1.5"/>
+          <circle cx="12" cy="12" r="3" fill="#e8473f"/>
+          <path d="M12 2 Q12 7 12 12" stroke="#e8473f" stroke-width="1" opacity="0.5"/>
+          <path d="M12 12 Q17 12 22 12" stroke="#e8473f" stroke-width="1" opacity="0.5"/>
+          <path d="M12 12 Q8.5 8.5 4.5 4.5" stroke="#e8473f" stroke-width="1" opacity="0.5"/>
         </svg>
-      </button>
-
-      <button id="playPauseButton" class="control-btn play-pause" title="Play/Pause">
-        <svg id="playIcon" viewBox="0 0 24 24" width="32" height="32">
-          <path d="M8 5v14l11-7z" fill="currentColor"/>
-        </svg>
-        <svg id="pauseIcon" viewBox="0 0 24 24" width="32" height="32" style="display:none">
-          <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" fill="currentColor"/>
-        </svg>
-      </button>
-
-      <button id="nextButton" class="control-btn" title="Next">
-        <svg viewBox="0 0 24 24" width="24" height="24">
-          <path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z" fill="currentColor"/>
-        </svg>
-      </button>
-    </div>
-
-    <div class="volume-row">
-      <span id="volumeIndicator" class="volume-indicator" title="Click to mute/unmute">🔊</span>
-      <input id="volumeSlider" class="volume-slider" type="range" min="0" max="100" value="100" title="Volume">
-    </div>
-
-    <div class="status-bar">
-      <span id="statusText">Not connected</span>
-    </div>
-
-    <div class="footer">
-      <div id="progressContainer" class="progress-container">
-        <div id="progressBar" class="progress-bar"></div>
+        <span>YT Audio</span>
       </div>
-      <div class="time-display">
+      <div class="header-status">
+        <span id="statusDot" class="status-dot"></span>
+        <span id="statusLabel">Stopped</span>
+      </div>
+    </div>
+
+    <!-- URL Input -->
+    <div class="url-section">
+      <div class="url-input-row">
+        <input
+          id="urlInput"
+          type="text"
+          placeholder="Paste YouTube URL or video ID…"
+          spellcheck="false"
+          autocomplete="off"
+        />
+        <button id="loadBtn" class="load-btn" title="Load">
+          <svg viewBox="0 0 24 24" width="16" height="16">
+            <path d="M12 4l-1.41 1.41L16.17 11H4v2h12.17l-5.58 5.59L12 20l8-8-8-8z" fill="currentColor"/>
+          </svg>
+        </button>
+      </div>
+      <div id="urlError" class="url-error" style="display:none"></div>
+    </div>
+
+    <!-- Now playing -->
+    <div class="now-playing">
+      <div class="art-wrapper">
+        <img id="albumArt" src="icons/placeholder.png" alt="Album art"/>
+        <div id="artOverlay" class="art-overlay">
+          <div class="vinyl-ring"></div>
+        </div>
+      </div>
+      <div class="track-meta">
+        <div id="trackTitle" class="track-title">No track loaded</div>
+        <div id="trackChannel" class="track-channel">—</div>
+      </div>
+    </div>
+
+    <!-- Progress -->
+    <div class="progress-section">
+      <div id="progressTrack" class="progress-track">
+        <div id="progressFill" class="progress-fill"></div>
+        <div id="progressThumb" class="progress-thumb"></div>
+      </div>
+      <div class="time-row">
         <span id="currentTime">0:00</span>
         <span id="totalTime">0:00</span>
       </div>
     </div>
+
+    <!-- Controls -->
+    <div class="controls">
+      <button id="shuffleBtn" class="ctrl-btn ctrl-small" title="Shuffle" data-active="false">
+        <svg viewBox="0 0 24 24" width="16" height="16">
+          <path d="M10.59 9.17L5.41 4 4 5.41l5.17 5.17 1.42-1.41zM14.5 4l2.04 2.04L4 18.59 5.41 20 17.96 7.46 20 9.5V4h-5.5zm.33 9.41l-1.41 1.42 3.13 3.13L14.5 20H20v-5.5l-2.04 2.04-3.13-3.13z" fill="currentColor"/>
+        </svg>
+      </button>
+      <button id="prevBtn" class="ctrl-btn ctrl-medium" title="Previous / Restart">
+        <svg viewBox="0 0 24 24" width="20" height="20">
+          <path d="M6 6h2v12H6zm3.5 6l8.5 6V6z" fill="currentColor"/>
+        </svg>
+      </button>
+      <button id="playPauseBtn" class="ctrl-btn ctrl-play" title="Play / Pause">
+        <svg id="playIcon" viewBox="0 0 24 24" width="28" height="28">
+          <path d="M8 5v14l11-7z" fill="currentColor"/>
+        </svg>
+        <svg id="pauseIcon" viewBox="0 0 24 24" width="28" height="28" style="display:none">
+          <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" fill="currentColor"/>
+        </svg>
+      </button>
+      <button id="nextBtn" class="ctrl-btn ctrl-medium" title="Next in queue">
+        <svg viewBox="0 0 24 24" width="20" height="20">
+          <path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z" fill="currentColor"/>
+        </svg>
+      </button>
+      <button id="repeatBtn" class="ctrl-btn ctrl-small" title="Repeat" data-active="false">
+        <svg viewBox="0 0 24 24" width="16" height="16">
+          <path d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4z" fill="currentColor"/>
+        </svg>
+      </button>
+    </div>
+
+    <!-- Volume -->
+    <div class="volume-section">
+      <button id="muteBtn" class="mute-btn" title="Mute">
+        <svg id="volIcon" viewBox="0 0 24 24" width="16" height="16">
+          <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z" fill="currentColor"/>
+        </svg>
+      </button>
+      <input id="volumeSlider" type="range" min="0" max="100" value="80" class="volume-slider"/>
+      <span id="volumeLabel" class="volume-label">80</span>
+    </div>
+
+    <!-- Queue -->
+    <div class="queue-section">
+      <div class="queue-header">
+        <span>Queue</span>
+        <button id="clearQueueBtn" class="queue-clear-btn">Clear</button>
+      </div>
+      <div id="queueList" class="queue-list">
+        <div class="queue-empty">Queue is empty</div>
+      </div>
+    </div>
+
   </div>
   <script src="sidepanel.js"></script>
 </body>

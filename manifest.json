@@ -1,11 +1,12 @@
 {
   "manifest_version": 3,
   "name": "YouTube Audio Controller",
-  "version": "1.0.0",
-  "description": "Play YouTube audio with controls in the side panel",
+  "version": "3.0.0",
+  "description": "WMP-style YouTube audio player — controls a background YouTube tab",
   "permissions": [
     "sidePanel",
-    "activeTab",
+    "storage",
+    "tabs",
     "scripting"
   ],
   "host_permissions": [
@@ -27,7 +28,7 @@
   },
   "content_scripts": [
     {
-      "matches": ["https://www.youtube.com/*"],
+      "matches": ["https://www.youtube.com/watch*"],
       "js": ["content.js"],
       "run_at": "document_idle"
     }

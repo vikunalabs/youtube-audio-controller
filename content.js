@@ -1,219 +1,190 @@
-// YouTube player interaction
+// ── YouTube Audio Controller — Content Script ────────────────────────────────
+//
+// Runs inside the YouTube tab. Controls the video element directly.
+// Pushes state updates to the side panel via background service worker.
 
-// Find the YouTube player video element
-function getPlayer() {
-  return document.querySelector('video') || null;
-}
+(function () {
+  // Guard against double-injection on SPA navigations
+  if (window.__ytAudioControllerLoaded) return;
+  window.__ytAudioControllerLoaded = true;
 
-// Get video metadata
-function getVideoInfo() {
-  try {
-    const titleElement = document.querySelector('h1.ytd-watch-metadata yt-formatted-string');
-    const title = titleElement ? titleElement.textContent.trim() : '';
+  const LOG = '[YT-Content]';
 
-    const channelElement = document.querySelector('ytd-channel-name a');
-    const channel = channelElement ? channelElement.textContent.trim() : '';
+  // ── Video element access ──────────────────────────────────────────────────
 
-    const video = getPlayer();
-    if (video) {
-      return {
-        title: title || 'Untitled Video',
-        channel: channel || 'Unknown Channel',
-        duration: video.duration || 0,
-        currentTime: video.currentTime || 0,
-        isPlaying: !video.paused,
-        success: true
-      };
-    }
-  } catch (e) {
-    console.error('Error getting video info:', e);
+  function getVideo() {
+    return document.querySelector('video');
   }
-  return { success: false, error: 'Could not fetch video info' };
-}
 
-// Control functions
-function togglePlay() {
-  const video = getPlayer();
-  if (video) {
-    if (video.paused) {
-      video.play();
-    } else {
-      video.pause();
-    }
-    return { success: true };
+  // ── State push ────────────────────────────────────────────────────────────
+
+  let pushTimer = null;
+
+  function pushState() {
+    const video = getVideo();
+    if (!video) return;
+
+    const urlParams  = new URLSearchParams(window.location.search);
+    const videoId    = urlParams.get('v') || '';
+    const titleEl    = document.querySelector('h1.ytd-watch-metadata yt-formatted-string') ||
+                       document.querySelector('#title h1');
+    const channelEl  = document.querySelector('ytd-channel-name a') ||
+                       document.querySelector('#channel-name a');
+
+    chrome.runtime.sendMessage({
+      target:      'sidePanel',
+      type:        'stateUpdate',
+      videoId,
+      title:       titleEl  ? titleEl.textContent.trim()  : document.title.replace(' - YouTube', ''),
+      channel:     channelEl ? channelEl.textContent.trim() : '',
+      paused:      video.paused,
+      currentTime: video.currentTime,
+      duration:    video.duration || 0,
+      volume:      video.volume,
+      muted:       video.muted,
+      ended:       video.ended,
+    }, () => { void chrome.runtime.lastError; });
   }
-  return { success: false, error: 'No video player found' };
-}
 
-function nextVideo() {
-  try {
-    const nextButton = document.querySelector('.ytp-next-button');
-    if (nextButton) {
-      nextButton.click();
-      return { success: true };
-    }
-  } catch (e) {}
+  // Debounced push — coalesces rapid events
+  function schedulePush(delay = 150) {
+    clearTimeout(pushTimer);
+    pushTimer = setTimeout(pushState, delay);
+  }
 
-  try {
-    const buttons = document.querySelectorAll('ytd-button-renderer');
-    for (const button of buttons) {
-      if (button.getAttribute('aria-label') === 'Next') {
-        button.click();
-        return { success: true };
+  // ── Video event listeners ─────────────────────────────────────────────────
+
+  function attachVideoListeners(video) {
+    if (video.__ytAudioBound) return;
+    video.__ytAudioBound = true;
+
+    video.addEventListener('play',         () => schedulePush());
+    video.addEventListener('pause',        () => schedulePush());
+    video.addEventListener('ended',        () => schedulePush());
+    video.addEventListener('volumechange', () => schedulePush());
+    video.addEventListener('seeking',      () => schedulePush());
+    video.addEventListener('seeked',       () => schedulePush());
+    video.addEventListener('durationchange', () => schedulePush());
+    video.addEventListener('loadedmetadata', () => {
+      schedulePush(500); // give metadata a moment to settle
+    });
+
+    // Push progress every second while playing
+    video.addEventListener('timeupdate', () => {
+      if (!video.paused && !video.__progressInterval) {
+        video.__progressInterval = setInterval(() => {
+          if (video.paused || video.ended) {
+            clearInterval(video.__progressInterval);
+            video.__progressInterval = null;
+          } else {
+            pushState();
+          }
+        }, 1000);
       }
-    }
-  } catch (e) {}
-
-  return { success: false, error: 'Could not find next button' };
-}
-
-function prevVideo() {
-  try {
-    const prevButton = document.querySelector('.ytp-prev-button');
-    if (prevButton) {
-      prevButton.click();
-      return { success: true };
-    }
-  } catch (e) {}
-
-  try {
-    const buttons = document.querySelectorAll('ytd-button-renderer');
-    for (const button of buttons) {
-      if (button.getAttribute('aria-label') === 'Previous') {
-        button.click();
-        return { success: true };
-      }
-    }
-  } catch (e) {}
-
-  return { success: false, error: 'Could not find previous button' };
-}
-
-function seekTo(percentage) {
-  const video = getPlayer();
-  if (video && video.duration) {
-    video.currentTime = percentage * video.duration;
-    return { success: true };
-  }
-  return { success: false, error: 'Could not seek' };
-}
-
-function setVolume(level) {
-  const video = getPlayer();
-  if (video) {
-    video.volume = Math.max(0, Math.min(1, level));
-    return { success: true, volume: video.volume };
-  }
-  return { success: false, error: 'No video player found' };
-}
-
-function getVolume() {
-  const video = getPlayer();
-  if (video) {
-    return { success: true, volume: video.volume, muted: video.muted };
-  }
-  return { success: false, error: 'No video player found' };
-}
-
-// Send updates to side panel; suppress error when panel is not open
-function sendUpdate() {
-  const info = getVideoInfo();
-  if (info.success) {
-    chrome.runtime.sendMessage({ action: 'videoUpdate', ...info }, () => {
-      // Suppress "receiving end does not exist" when side panel is closed
-      void chrome.runtime.lastError;
     });
   }
-}
 
-// Listen for messages from background
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  let result;
-
-  switch (message.action) {
-    case 'togglePlay':
-      result = togglePlay();
-      break;
-    case 'prev':
-      result = prevVideo();
-      break;
-    case 'next':
-      result = nextVideo();
-      break;
-    case 'seek':
-      result = seekTo(message.percentage);
-      break;
-    case 'setVolume':
-      result = setVolume(message.level);
-      break;
-    case 'getInfo':
-      result = getVideoInfo();
-      // Include volume in getInfo response
-      const volInfo = getVolume();
-      if (volInfo.success) {
-        result.volume = volInfo.volume;
-        result.muted = volInfo.muted;
+  // Watch for video element appearing (YouTube is SPA — video may load late)
+  function watchForVideo() {
+    const video = getVideo();
+    if (video) {
+      attachVideoListeners(video);
+      schedulePush(500);
+      return;
+    }
+    // Poll until video appears
+    const poll = setInterval(() => {
+      const v = getVideo();
+      if (v) {
+        clearInterval(poll);
+        attachVideoListeners(v);
+        schedulePush(500);
       }
-      break;
-    default:
-      result = { success: false, error: 'Unknown action' };
+    }, 500);
   }
 
-  sendResponse(result);
-});
+  watchForVideo();
 
-// Push updates to side panel on player events
-document.addEventListener('play', (e) => {
-  if (e.target.tagName === 'VIDEO') {
-    setTimeout(sendUpdate, 100);
-  }
-}, true);
-
-document.addEventListener('pause', (e) => {
-  if (e.target.tagName === 'VIDEO') {
-    setTimeout(sendUpdate, 100);
-  }
-}, true);
-
-document.addEventListener('volumechange', (e) => {
-  if (e.target.tagName === 'VIDEO') {
-    setTimeout(sendUpdate, 100);
-  }
-}, true);
-
-document.addEventListener('timeupdate', (e) => {
-  if (e.target.tagName === 'VIDEO') {
-    if (!e.target._lastUpdate || Date.now() - e.target._lastUpdate > 500) {
-      e.target._lastUpdate = Date.now();
-      sendUpdate();
-    }
-  }
-}, true);
-
-// Initial update after page loads
-setTimeout(sendUpdate, 1000);
-
-// Fallback periodic update (low frequency — push events handle the rest)
-setInterval(sendUpdate, 5000);
-
-// Detect YouTube SPA navigation by observing the title element only
-const titleObserver = new MutationObserver(() => {
-  setTimeout(sendUpdate, 1000);
-});
-
-const titleEl = document.querySelector('title');
-if (titleEl) {
-  titleObserver.observe(titleEl, { childList: true });
-} else {
-  // Fallback: observe head until title is available
-  const headObserver = new MutationObserver(() => {
-    const t = document.querySelector('title');
-    if (t) {
-      headObserver.disconnect();
-      titleObserver.observe(t, { childList: true });
-    }
+  // Re-attach on YouTube SPA navigation
+  document.addEventListener('yt-navigate-finish', () => {
+    window.__ytAudioControllerLoaded = false; // allow re-init on navigation
+    setTimeout(() => {
+      window.__ytAudioControllerLoaded = true;
+      watchForVideo();
+      schedulePush(1000);
+    }, 500);
   });
-  headObserver.observe(document.head || document.documentElement, { childList: true });
-}
 
-console.log('YouTube Audio Controller: Content script loaded');
+  // ── Command handler ───────────────────────────────────────────────────────
+
+  chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    // Respond to ping (used by background to check if script is ready)
+    if (message.action === 'ping') {
+      sendResponse({ ready: true });
+      return false;
+    }
+
+    if (message.target !== 'contentScript') return false;
+
+    const video = getVideo();
+
+    switch (message.action) {
+      case 'play':
+        if (video) video.play().catch(() => {});
+        sendResponse({ success: true });
+        break;
+
+      case 'pause':
+        if (video) video.pause();
+        sendResponse({ success: true });
+        break;
+
+      case 'seekTo':
+        if (video && message.seconds !== undefined) {
+          video.currentTime = message.seconds;
+        }
+        sendResponse({ success: true });
+        break;
+
+      case 'setVolume':
+        if (video && message.volume !== undefined) {
+          video.volume = Math.max(0, Math.min(1, message.volume / 100));
+        }
+        sendResponse({ success: true });
+        break;
+
+      case 'mute':
+        if (video) video.muted = true;
+        sendResponse({ success: true });
+        break;
+
+      case 'unMute':
+        if (video) { video.muted = false; }
+        sendResponse({ success: true });
+        break;
+
+      case 'getState':
+        if (!video) {
+          sendResponse({ success: false, error: 'No video element' });
+        } else {
+          sendResponse({
+            success: true,
+            paused: video.paused,
+            currentTime: video.currentTime,
+            duration: video.duration || 0,
+            volume: video.volume,
+            muted: video.muted,
+            ended: video.ended,
+          });
+        }
+        break;
+
+      default:
+        sendResponse({ success: false, error: `Unknown action: ${message.action}` });
+    }
+
+    return false;
+  });
+
+  console.log(LOG, 'Content script loaded on', window.location.href);
+})();
